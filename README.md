@@ -1,5 +1,7 @@
 # Revery 🦅
 
+Goal: deploy it by 4.7 (locally first, then alicloud)
+
 **Revery** is a _semantic search engine_ that operates on my [Monocle](https://thesephist.com/posts/monocle) search index. While Revery lets me search through the same database of tens of thousands of notes, bookmarks, journal entries, Tweets, contacts, and blog posts as Monocle, Revery's focus is not on _keyword-based_ search that Monocle performs, but instead on _semantic search_ -- finding results that are topically similar to some given web page or query, even if they don't share the same words. It's available as a browser extension that can surface relevant results to the current page, as well as a more standard web app resembling Monocle's search page.
 
 ![Revery's browser extension and web interface running on an iPad and a laptop](static/img/revery-devices.png)
@@ -38,11 +40,11 @@ As mentioned above, Revery's core is a single API endpoint that takes in some do
 
 This kind of semantic search is enabled by a search algorithm that uses _cosine similarity_ to cluster _document embeddings_ of the indexed documents. If that sounds like a bunch of random words to you (as it did to me when I started this project), let me break it down:
 
-First, we'll need to understand **[word embeddings](https://en.wikipedia.org/wiki/Word_embedding)**. A word embedding is a way of mapping a vocabulary of natural language words to some points in space (usually a high-dimensional mathematical space), such that words that are similar in meaning are close together in this space. For example, the word "science" in a word embedding would be very close to the word "scientist", reasonably close to "research", and likely very far from "circus".  When we talk about "distance" in the context of word embeddings, we usually use [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) rather than Euclidean distance, for both empirical and theoretical reasons I won't cover here.
+First, we'll need to understand **[word embeddings](https://en.wikipedia.org/wiki/Word_embedding)**. A word embedding is a way of mapping a vocabulary of natural language words to some points in space (usually a high-dimensional mathematical space), such that words that are similar in meaning are close together in this space. For example, the word "science" in a word embedding would be very close to the word "scientist", reasonably close to "research", and likely very far from "circus". When we talk about "distance" in the context of word embeddings, we usually use [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) rather than Euclidean distance, for both empirical and theoretical reasons I won't cover here.
 
 Although the concept of word embeddings is not very new, there is still active research producing new methods for generating more and more accurate and useful word embeddings from the same corpus of data. My personal deployment of Revery uses the Creative Commons-licensed word embedding dataset produced by Facebook's [FastText](https://fasttext.cc/docs/en/support.html) tool, specifically a 50,000-word dataset with 300 dimensions trained on the [Common Crawl](https://commoncrawl.org/the-data/) corpus.
 
-Word embeddings let us draw inferences about which _words_ are related, but for Revery, we want to draw the same kind of inference about _documents_, which are a list of words. Thankfully, there's ample literature to suggest that simply taking a weighted average of word vectors for every word in a document can get us a good approximation of a "document vector" that represents the document as a whole. Though there are more advanced methods we can use, like [paragraph vectors](https://arxiv.org/abs/1507.07998) or models that take word order into account like BERT, averaging word vectors works well enough for Revery's use cases, and is simple  to implement and test, so Revery sticks with this approach.
+Word embeddings let us draw inferences about which _words_ are related, but for Revery, we want to draw the same kind of inference about _documents_, which are a list of words. Thankfully, there's ample literature to suggest that simply taking a weighted average of word vectors for every word in a document can get us a good approximation of a "document vector" that represents the document as a whole. Though there are more advanced methods we can use, like [paragraph vectors](https://arxiv.org/abs/1507.07998) or models that take word order into account like BERT, averaging word vectors works well enough for Revery's use cases, and is simple to implement and test, so Revery sticks with this approach.
 
 Once we can generate document vectors out of documents using our word embedding, the rest of the algorithm falls into place. On startup, Revery's API server indexes and generates document vectors for all of the documents it can find in my dataset (which isn't too large -- around 25,000 at time of writing), and on every request, the algorithm computes a document vector for the requested document, and sorts every document in the search index by its cosine distance to the query document, to return some top _n_ results.
 
@@ -66,9 +68,10 @@ Revery has two independent codebases in the same repository. The first is the Ch
 
 1. The extension needs an API authentication token to talk to the Revery API. I usually just choose an arbitrarily long random string. Then, I place a file in `./extension` called `token.js` with the content:
 
-	```js
-	const REVERY_TOKEN = '<some API key here>';
-	```
+   ```js
+   const REVERY_TOKEN = "<some API key here>";
+   ```
+
 2. I go to `chrome://extensions` and click "Load unpacked" to load the `./extension` folder as an "unpacked extension" into my browser, which will make the extension available in every tab.
 
 That's it for the extension setup. Next, I set up the server:
@@ -76,8 +79,8 @@ That's it for the extension setup. Next, I set up the server:
 1. Take the same authentication token from above, and place just the token string itself inside `tokens.txt` in the root of the project folder. The Revery server will grab the whitespace-trimmed content of this file and use it as the API key.
 2. Simply running `make` will build the `revery` binary executable into the project folder.
 3. Revery needs two extra sets of data to work: the word embedding model, and Monocle's document dataset.
-	- Download a word embedding file (for example, from [FastText](https://fasttext.cc/docs/en/english-vectors.html)) and trim it to some reasonable size (top 50-100k words seems to work well). Trim the first line, which usually indicates the total word count and number of dimensions. Revery's code assumes 300 dimensions, so if this is not the case, revise the code.
-	- Copy Monocle's `docs.json` document dataset generated by the indexer to `./corpus/docs.json`.
+   - Download a word embedding file (for example, from [FastText](https://fasttext.cc/docs/en/english-vectors.html)) and trim it to some reasonable size (top 50-100k words seems to work well). Trim the first line, which usually indicates the total word count and number of dimensions. Revery's code assumes 300 dimensions, so if this is not the case, revise the code.
+   - Copy Monocle's `docs.json` document dataset generated by the indexer to `./corpus/docs.json`.
 4. Running the `revery` executable now should correctly pre-process the model and search index, and start the web application server.
 
 ## Prior art and future work
